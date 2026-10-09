@@ -1,0 +1,17 @@
+name = "maison-recipes"
+main = "worker/index.ts"
+compatibility_date = "2026-10-09"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "maison-recipes"
+database_id = "03c804b3-76eb-496d-8f03-2c9da06211aa"
+migrations_dir = "migrations"
+
+[vars]
+ALLOWED_EMAIL = "dmdani1997@gmail.com"
