@@ -14,4 +14,6 @@ database_id = "03c804b3-76eb-496d-8f03-2c9da06211aa"
 migrations_dir = "migrations"
 
 [vars]
+ACCESS_AUD = "f11011350a051072ad5a154cf7d0698c21cf822b2d73a4bb5248e904a4af17c8"
+ACCESS_TEAM_DOMAIN = "xjdevs.cloudflareaccess.com"
 ALLOWED_EMAIL = "dmdani1997@gmail.com"
