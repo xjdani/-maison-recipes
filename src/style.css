@@ -16,3 +16,6 @@
 .recipe-quick-actions button:hover{background:#e7e9df}
 .footer-note{display:inline-flex;align-items:center;gap:7px}
 .footer-note svg{color:#a36f58}
+
+/* Fixed food taxonomy */
+.form-fields select{width:100%;border:1px solid #dfdfd5;border-radius:7px;padding:12px 38px 12px 12px;background:#fff;color:#333;appearance:auto;min-height:47px}.form-fields select:focus-visible{outline:3px solid #b5b99b;outline-offset:3px}
