@@ -6,3 +6,13 @@
 
 /* One-paste recipe import */
 .import-modal{max-width:540px}.import-modal form{display:grid;gap:12px}.import-label{font-size:12px;font-weight:700;color:#485243}.import-url{height:54px;width:100%;border:1px solid #dcded3;border-radius:11px;background:white;color:#2e342c;padding:0 15px;font-size:15px;outline-offset:3px}.import-url:focus{border-color:#667961}.import-submit{width:100%;height:49px;margin-top:4px;font-weight:700}.import-help{font-size:12px;line-height:1.6;color:#80867b;margin:0}.import-error{color:#a2322d;background:#fff0ec;padding:12px 14px;border-radius:9px;font-size:13px;line-height:1.6;margin:0}.import-modal .modal-head h2{margin:0 0 13px}
+
+/* Consistent iconography */
+.header-icon{color:#394735;transition:background .18s ease,transform .18s ease}
+.header-icon:hover{background:#e4e8dc;transform:translateY(-1px)}
+.tiny-star{display:inline-block;vertical-align:middle;color:#b47d60;margin-right:7px}
+.category-scroll .chip{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.recipe-quick-actions button{display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .18s ease,color .18s ease}
+.recipe-quick-actions button:hover{background:#e7e9df}
+.footer-note{display:inline-flex;align-items:center;gap:7px}
+.footer-note svg{color:#a36f58}
