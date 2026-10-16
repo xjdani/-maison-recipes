@@ -1,6 +1,6 @@
 interface Env { DB: D1Database; ASSETS: Fetcher; ACCESS_AUD?: string; ACCESS_TEAM_DOMAIN?: string; ALLOWED_EMAIL?: string }
-type Recipe = { id: string; title: string; description: string; image: string; category: string; prep_minutes: number; cook_minutes: number; servings: number; ingredients: unknown[]; steps: unknown[]; source_url: string; favorite: number; created_at?: string; updated_at?: string };
-const fields = "id,title,description,image,category,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite,created_at,updated_at";
+type Recipe = { id: string; title: string; description: string; image: string; category: string; subcategory: string; prep_minutes: number; cook_minutes: number; servings: number; ingredients: unknown[]; steps: unknown[]; source_url: string; favorite: number; created_at?: string; updated_at?: string };
+const fields = "id,title,description,image,category,subcategory,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite,created_at,updated_at";
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } }); }
 function normalize(row: Record<string, unknown>) { return { ...row, ingredients: JSON.parse(String(row.ingredients || "[]")), steps: JSON.parse(String(row.steps || "[]")), favorite: Boolean(row.favorite) }; }
 async function owner(request: Request, env: Env): Promise<boolean> {
@@ -33,9 +33,23 @@ function validatedCategory(input: unknown): string {
   if (typeof input !== "string" || !FOOD_CATEGORIES.includes(input as typeof FOOD_CATEGORIES[number])) throw Error("Choose Desi Food, Fast Food, or Foreign Food.");
   return input;
 }
+const SUBCATEGORIES: Record<string,readonly string[]> = {
+  "Desi Food":["Rice","Meat","Vegetables","BBQ","Desserts"],
+  "Fast Food":["Burgers","Pizza","Wraps & Shawarma","Sandwiches","Sides & Snacks"],
+  "Foreign Food":["Pasta","Baked Dishes","Rice & Noodles","Seafood","Breakfast & Brunch"]
+};
+function classifySubcategory(category:string,title:string):string {
+ const t=title.toLowerCase();
+ if(category==="Desi Food"){if(/biryani|pulao|rice|chawal/.test(t))return "Rice";if(/tikka|kebab|seekh|bbq|grill/.test(t))return "BBQ";if(/halwa|kheer|firni|dessert|mithai|shahi tuk/.test(t))return "Desserts";if(/daal|dal|aloo|palak|saag|bhindi|vegetable|paratha/.test(t))return "Vegetables";return "Meat";}
+ if(category==="Fast Food"){if(/pizza/.test(t))return "Pizza";if(/shawarma|wrap|roll/.test(t))return "Wraps & Shawarma";if(/sandwich|club|sub/.test(t))return "Sandwiches";if(/fries|nugget|wings|snack/.test(t))return "Sides & Snacks";return "Burgers";}
+ if(/pasta|spaghetti|alfredo|bolognese/.test(t))return "Pasta";if(/lasagna|bake|casserole/.test(t))return "Baked Dishes";if(/rice|noodle|ramen/.test(t))return "Rice & Noodles";if(/shrimp|prawn|fish|salmon|seafood/.test(t))return "Seafood";return "Breakfast & Brunch";
+}
 function safeRecipe(body: any): Recipe {
   if (!body || typeof body.title !== "string" || !body.title.trim() || body.title.length > 250) throw Error("A recipe title is required");
-  return { id: typeof body.id === "string" ? body.id : crypto.randomUUID(), title: body.title.trim(), description: String(body.description || "").slice(0, 3000), image: String(body.image || "").slice(0, 2000), category: validatedCategory(body.category), prep_minutes: Math.max(0, Number(body.prep_minutes) || 0), cook_minutes: Math.max(0, Number(body.cook_minutes) || 0), servings: Math.max(1, Number(body.servings) || 4), ingredients: Array.isArray(body.ingredients) ? body.ingredients.slice(0, 200) : [], steps: Array.isArray(body.steps) ? body.steps.slice(0, 100) : [], source_url: String(body.source_url || "").slice(0, 2000), favorite: body.favorite ? 1 : 0 };
+  const foodCategory=validatedCategory(body.category);
+  const subcategory=body.subcategory || classifySubcategory(foodCategory,body.title);
+  if(!SUBCATEGORIES[foodCategory].includes(subcategory)) throw Error("Choose a valid subcategory.");
+  return { id: typeof body.id === "string" ? body.id : crypto.randomUUID(), title: body.title.trim(), description: String(body.description || "").slice(0, 3000), image: String(body.image || "").slice(0, 2000), category: foodCategory, subcategory, prep_minutes: Math.max(0, Number(body.prep_minutes) || 0), cook_minutes: Math.max(0, Number(body.cook_minutes) || 0), servings: Math.max(1, Number(body.servings) || 4), ingredients: Array.isArray(body.ingredients) ? body.ingredients.slice(0, 200) : [], steps: Array.isArray(body.steps) ? body.steps.slice(0, 100) : [], source_url: String(body.source_url || "").slice(0, 2000), favorite: body.favorite ? 1 : 0 };
 }
 
 function recipeFromSchema(raw: unknown) {
@@ -140,7 +154,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
       const body = await request.json() as { url?: string };
       const recipe = await scanRecipe(body.url || "");
       recipe.id = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO recipes (id,title,description,image,category,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(recipe.id,recipe.title,recipe.description,recipe.image,recipe.category,recipe.prep_minutes,recipe.cook_minutes,recipe.servings,JSON.stringify(recipe.ingredients),JSON.stringify(recipe.steps),recipe.source_url,recipe.favorite).run();
+      await env.DB.prepare("INSERT INTO recipes (id,title,description,image,category,subcategory,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(recipe.id,recipe.title,recipe.description,recipe.image,recipe.category,recipe.subcategory,recipe.prep_minutes,recipe.cook_minutes,recipe.servings,JSON.stringify(recipe.ingredients),JSON.stringify(recipe.steps),recipe.source_url,recipe.favorite).run();
       return json({ ...recipe, favorite: false },201);
     } catch (e) { return json({error: e instanceof Error ? e.message : "Recipe could not be imported."},400); }
   }
@@ -149,7 +163,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     try {
       const recipe = safeRecipe(await request.json());
       recipe.id = crypto.randomUUID();
-      await env.DB.prepare("INSERT INTO recipes (id,title,description,image,category,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(recipe.id, recipe.title, recipe.description, recipe.image, recipe.category, recipe.prep_minutes, recipe.cook_minutes, recipe.servings, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.steps), recipe.source_url, recipe.favorite).run();
+      await env.DB.prepare("INSERT INTO recipes (id,title,description,image,category,subcategory,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)").bind(recipe.id, recipe.title, recipe.description, recipe.image, recipe.category, recipe.subcategory, recipe.prep_minutes, recipe.cook_minutes, recipe.servings, JSON.stringify(recipe.ingredients), JSON.stringify(recipe.steps), recipe.source_url, recipe.favorite).run();
       return json(recipe, 201);
     } catch (e) { return json({ error: String(e) }, 400); }
   }
@@ -157,7 +171,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (adminMatch && request.method === "PUT") {
     try {
       const recipe = safeRecipe(await request.json());
-      const result = await env.DB.prepare("UPDATE recipes SET title=?,description=?,image=?,category=?,prep_minutes=?,cook_minutes=?,servings=?,ingredients=?,steps=?,source_url=?,favorite=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(recipe.title,recipe.description,recipe.image,recipe.category,recipe.prep_minutes,recipe.cook_minutes,recipe.servings,JSON.stringify(recipe.ingredients),JSON.stringify(recipe.steps),recipe.source_url,recipe.favorite,adminMatch[1]).run();
+      const result = await env.DB.prepare("UPDATE recipes SET title=?,description=?,image=?,category=?,subcategory=?,prep_minutes=?,cook_minutes=?,servings=?,ingredients=?,steps=?,source_url=?,favorite=?,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(recipe.title,recipe.description,recipe.image,recipe.category,recipe.subcategory,recipe.prep_minutes,recipe.cook_minutes,recipe.servings,JSON.stringify(recipe.ingredients),JSON.stringify(recipe.steps),recipe.source_url,recipe.favorite,adminMatch[1]).run();
       return result.meta.changes ? json({ ...recipe, id: adminMatch[1] }) : json({ error: "Not found" }, 404);
     } catch (e) { return json({ error: String(e) }, 400); }
   }
