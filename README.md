@@ -1,6 +1,6 @@
-# Maison Recipes
+# Cook With Daniel
 
-A public recipe-sharing website. Visitors can browse recipes, scale servings, and convert measurements. Only the owner can create, edit, import, or delete recipes.
+A public recipe-sharing website at https://food.hasooleilm.org. Visitors can browse recipes, scale servings, and convert measurements. Only the owner can create, edit, import, or delete recipes.
 
 ## Stack
 React, Vite, TypeScript, Cloudflare Workers, Cloudflare D1, Cloudflare Access.
