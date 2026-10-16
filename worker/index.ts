@@ -40,7 +40,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   }
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
-  if (request.method === "GET" && url.pathname === "/api/admin/session") return json({ admin: true });
+  if (request.method === "GET" && url.pathname === "/api/admin/session") return url.searchParams.has("login") ? Response.redirect(new URL("/",request.url).toString(),302) : json({ admin: true });
   if (request.method === "POST" && url.pathname === "/api/admin/recipes") {
     try {
       const recipe = safeRecipe(await request.json());
