@@ -26,6 +26,29 @@ function safeRecipe(body: any): Recipe {
   if (!body || typeof body.title !== "string" || !body.title.trim() || body.title.length > 250) throw Error("A recipe title is required");
   return { id: typeof body.id === "string" ? body.id : crypto.randomUUID(), title: body.title.trim(), description: String(body.description || "").slice(0, 3000), image: String(body.image || "").slice(0, 2000), category: String(body.category || "Dinner").slice(0, 60), prep_minutes: Math.max(0, Number(body.prep_minutes) || 0), cook_minutes: Math.max(0, Number(body.cook_minutes) || 0), servings: Math.max(1, Number(body.servings) || 4), ingredients: Array.isArray(body.ingredients) ? body.ingredients.slice(0, 200) : [], steps: Array.isArray(body.steps) ? body.steps.slice(0, 100) : [], source_url: String(body.source_url || "").slice(0, 2000), favorite: body.favorite ? 1 : 0 };
 }
+
+function recipeFromSchema(raw: unknown) {
+  const candidates: any[] = [];
+  function visit(value: any): void {
+    if (!value || typeof value !== "object") return;
+    if (Array.isArray(value)) { value.forEach(visit); return; }
+    if (value["@type"] === "Recipe" || (Array.isArray(value["@type"]) && value["@type"].includes("Recipe"))) candidates.push(value);
+    if (value["@graph"]) visit(value["@graph"]);
+  }
+  visit(raw);
+  const r = candidates[0];
+  if (!r || !r.name) throw Error("No valid Recipe schema found");
+  const instructions: string[] = [];
+  function steps(v: any): void {
+    if (typeof v === "string") instructions.push(v);
+    else if (Array.isArray(v)) v.forEach(steps);
+    else if (v && typeof v === "object") { if (v.text) instructions.push(String(v.text)); else if (v.itemListElement) steps(v.itemListElement); }
+  }
+  steps(r.recipeInstructions);
+  const img = Array.isArray(r.image) ? r.image[0] : r.image;
+  return safeRecipe({title:r.name,description:r.description||"",image:typeof img==="string"?img:img?.url||"",category:Array.isArray(r.recipeCategory)?r.recipeCategory[0]:r.recipeCategory||"Dinner",servings:parseInt(String(Array.isArray(r.recipeYield)?r.recipeYield[0]:r.recipeYield||4),10)||4,ingredients:(r.recipeIngredient||[]).map((v:string)=>({amount:0,unit:"",name:String(v)})),steps:instructions});
+}
+
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
@@ -41,6 +64,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
   if (request.method === "GET" && url.pathname === "/api/admin/session") return url.searchParams.has("login") ? Response.redirect(new URL("/",request.url).toString(),302) : json({ admin: true });
+  if (request.method === "POST" && url.pathname === "/api/admin/import-schema") { try { const raw = await request.text(); if(raw.length>200000) return json({error:"Recipe data too large"},413); return json(recipeFromSchema(JSON.parse(raw))); } catch(e) { return json({error:String(e)},400); } }
   if (request.method === "POST" && url.pathname === "/api/admin/recipes") {
     try {
       const recipe = safeRecipe(await request.json());
