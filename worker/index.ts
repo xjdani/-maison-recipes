@@ -49,6 +49,66 @@ function recipeFromSchema(raw: unknown) {
   return safeRecipe({title:r.name,description:r.description||"",image:typeof img==="string"?img:img?.url||"",category:Array.isArray(r.recipeCategory)?r.recipeCategory[0]:r.recipeCategory||"Dinner",servings:parseInt(String(Array.isArray(r.recipeYield)?r.recipeYield[0]:r.recipeYield||4),10)||4,ingredients:(r.recipeIngredient||[]).map((v:string)=>({amount:0,unit:"",name:String(v)})),steps:instructions});
 }
 
+
+function cleanText(v: unknown): string {
+  return String(v ?? "").replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|apos|nbsp|lt|gt|#39);/g, x => ({"&amp;":"&","&quot;":'"',"&apos;":"'","&nbsp;":" ","&lt;":"<","&gt;":">","&#39;":"'"} as Record<string,string>)[x] || x).replace(/\\s+/g," ").trim();
+}
+function parseRecipePage(html: string, source: string): Recipe {
+  const scripts = [...html.matchAll(/<script\\b(?=[^>]*\\btype\\s*=\\s*["']application\\/ld\\+json["'])[^>]*>([\\s\\S]*?)<\\/script\\s*>/gi)];
+  let found: Recipe | null = null;
+  for (const script of scripts) {
+    try {
+      const parsed = JSON.parse(script[1]);
+      const candidate = recipeFromSchema(parsed);
+      if (candidate.ingredients.length && candidate.steps.length) {
+        found = candidate;
+        break;
+      }
+    } catch {}
+  }
+  if (!found) throw Error("This page does not expose a complete readable recipe. Try a different recipe website.");
+  found.source_url = source;
+  const normalized = (value: string) => { try { const url = new URL(value,source); return url.protocol === "https:" || url.protocol === "http:" ? url.href : ""; } catch { return ""; } };
+  found.image = normalized(found.image);
+  found.title = cleanText(found.title);
+  found.description = cleanText(found.description);
+  found.steps = (found.steps as string[]).map(cleanText).filter(Boolean);
+  found.ingredients = (found.ingredients as Array<{amount:number;unit:string;name:string}>).map(i => ({amount: i.amount,unit:i.unit,name:cleanText(i.name)})).filter(i=>i.name);
+  return found;
+}
+function checkedUrl(input: string): URL {
+  if (typeof input !== "string" || input.length > 2048) throw Error("Paste a valid recipe website link.");
+  let u: URL;
+  try { u = new URL(input.trim()); } catch { throw Error("Paste a complete HTTPS website URL."); }
+  const host = u.hostname.toLowerCase();
+  if (u.protocol !== "https:" || u.username || u.password || u.port || !host.includes(".") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".localhost") || host.endsWith(".test") || host.endsWith(".invalid") || host.endsWith(".example") || host === "localhost" || /^[\\d.]+$/.test(host) || host.includes(":")) throw Error("Only public HTTPS recipe websites are supported.");
+  return u;
+}
+async function scanRecipe(link: string): Promise<Recipe> {
+  const target = checkedUrl(link);
+  const response = await fetch(target.toString(), { redirect: "manual", headers: { "Accept": "text/html,application/xhtml+xml" }, signal: AbortSignal.timeout(12000) });
+  if (response.status >= 300 && response.status < 400) throw Error("The recipe site redirected this request. Paste the final recipe page URL.");
+  if (!response.ok) throw Error("This website blocked access or the page is unavailable.");
+  if (!(response.headers.get("content-type") || "").toLowerCase().includes("text/html")) throw Error("This link is not an HTML recipe page.");
+  const limit = 1500000;
+  if (Number(response.headers.get("content-length") || 0) > limit) throw Error("Recipe page is too large to scan.");
+  const reader = response.body?.getReader();
+  if (!reader) throw Error("Could not read recipe page.");
+  let count = 0;
+  const chunks: Uint8Array[] = [];
+  while (true) {
+    const next = await reader.read();
+    if (next.done) break;
+    count += next.value.byteLength;
+    if (count > limit) { await reader.cancel(); throw Error("Recipe page is too large to scan."); }
+    chunks.push(next.value);
+  }
+  const bytes = new Uint8Array(count);
+  let offset=0;
+  for (const chunk of chunks) { bytes.set(chunk,offset); offset+=chunk.byteLength; }
+  return parseRecipePage(new TextDecoder().decode(bytes),target.toString());
+}
+
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
@@ -64,6 +124,15 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
   if (request.method === "GET" && url.pathname === "/api/admin/session") return url.searchParams.has("login") ? Response.redirect(new URL("/",request.url).toString(),302) : json({ admin: true });
+  if (request.method === "POST" && url.pathname === "/api/admin/import-url") {
+    try {
+      const body = await request.json() as { url?: string };
+      const recipe = await scanRecipe(body.url || "");
+      recipe.id = crypto.randomUUID();
+      await env.DB.prepare("INSERT INTO recipes (id,title,description,image,category,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)").bind(recipe.id,recipe.title,recipe.description,recipe.image,recipe.category,recipe.prep_minutes,recipe.cook_minutes,recipe.servings,JSON.stringify(recipe.ingredients),JSON.stringify(recipe.steps),recipe.source_url,recipe.favorite).run();
+      return json({ ...recipe, favorite: false },201);
+    } catch (e) { return json({error: e instanceof Error ? e.message : "Recipe could not be imported."},400); }
+  }
   if (request.method === "POST" && url.pathname === "/api/admin/import-schema") { try { const raw = await request.text(); if(raw.length>200000) return json({error:"Recipe data too large"},413); return json(recipeFromSchema(JSON.parse(raw))); } catch(e) { return json({error:String(e)},400); } }
   if (request.method === "POST" && url.pathname === "/api/admin/recipes") {
     try {
