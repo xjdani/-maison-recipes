@@ -22,9 +22,20 @@ async function owner(request: Request, env: Env): Promise<boolean> {
     return crypto.subtle.verify("RSASSA-PKCS1-v1_5", cryptoKey, decode(signature), new TextEncoder().encode(header + "." + payload));
   } catch { return false; }
 }
+const FOOD_CATEGORIES = ["Desi Food", "Fast Food", "Foreign Food"] as const;
+function classifyFood(title: string, category = ""): string {
+  const text = (title + " " + category).toLowerCase();
+  if (/\b(biryani|pulao|karahi|korma|qorma|nihari|haleem|daal|dal|saag|paratha|roti|chapati|tikka|seekh|chapli|pakora|samosa|chana|halwa|kheer|aloo|bhindi|palak|keema|qeema|kofta|handi|desi|pakistani|indian|lahori)\b/.test(text)) return "Desi Food";
+  if (/\b(burger|pizza|fries|french fries|hot dog|sandwich|wrap|shawarma|nuggets|fried chicken|wings|taco|nachos|submarine|fast food|street food)\b/.test(text)) return "Fast Food";
+  return "Foreign Food";
+}
+function validatedCategory(input: unknown): string {
+  if (typeof input !== "string" || !FOOD_CATEGORIES.includes(input as typeof FOOD_CATEGORIES[number])) throw Error("Choose Desi Food, Fast Food, or Foreign Food.");
+  return input;
+}
 function safeRecipe(body: any): Recipe {
   if (!body || typeof body.title !== "string" || !body.title.trim() || body.title.length > 250) throw Error("A recipe title is required");
-  return { id: typeof body.id === "string" ? body.id : crypto.randomUUID(), title: body.title.trim(), description: String(body.description || "").slice(0, 3000), image: String(body.image || "").slice(0, 2000), category: String(body.category || "Dinner").slice(0, 60), prep_minutes: Math.max(0, Number(body.prep_minutes) || 0), cook_minutes: Math.max(0, Number(body.cook_minutes) || 0), servings: Math.max(1, Number(body.servings) || 4), ingredients: Array.isArray(body.ingredients) ? body.ingredients.slice(0, 200) : [], steps: Array.isArray(body.steps) ? body.steps.slice(0, 100) : [], source_url: String(body.source_url || "").slice(0, 2000), favorite: body.favorite ? 1 : 0 };
+  return { id: typeof body.id === "string" ? body.id : crypto.randomUUID(), title: body.title.trim(), description: String(body.description || "").slice(0, 3000), image: String(body.image || "").slice(0, 2000), category: validatedCategory(body.category), prep_minutes: Math.max(0, Number(body.prep_minutes) || 0), cook_minutes: Math.max(0, Number(body.cook_minutes) || 0), servings: Math.max(1, Number(body.servings) || 4), ingredients: Array.isArray(body.ingredients) ? body.ingredients.slice(0, 200) : [], steps: Array.isArray(body.steps) ? body.steps.slice(0, 100) : [], source_url: String(body.source_url || "").slice(0, 2000), favorite: body.favorite ? 1 : 0 };
 }
 
 function recipeFromSchema(raw: unknown) {
@@ -46,7 +57,7 @@ function recipeFromSchema(raw: unknown) {
   }
   steps(r.recipeInstructions);
   const img = Array.isArray(r.image) ? r.image[0] : r.image;
-  return safeRecipe({title:r.name,description:r.description||"",image:typeof img==="string"?img:img?.url||"",category:Array.isArray(r.recipeCategory)?r.recipeCategory[0]:r.recipeCategory||"Dinner",servings:parseInt(String(Array.isArray(r.recipeYield)?r.recipeYield[0]:r.recipeYield||4),10)||4,ingredients:(r.recipeIngredient||[]).map((v:string)=>({amount:0,unit:"",name:String(v)})),steps:instructions});
+  return safeRecipe({title:r.name,description:r.description||"",image:typeof img==="string"?img:img?.url||"",category:classifyFood(String(r.name),String(Array.isArray(r.recipeCategory)?r.recipeCategory[0]:r.recipeCategory||"")),servings:parseInt(String(Array.isArray(r.recipeYield)?r.recipeYield[0]:r.recipeYield||4),10)||4,ingredients:(r.recipeIngredient||[]).map((v:string)=>({amount:0,unit:"",name:String(v)})),steps:instructions});
 }
 
 
