@@ -35,3 +35,23 @@ body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 @media(min-width:900px){.glass-dock{bottom:23px}.dock-item{min-height:64px}}
 @media(max-width:370px){.glass-dock{width:calc(100% - 18px);padding:5px;border-radius:23px}.dock-item{font-size:9px;min-height:57px;border-radius:18px}}
 @media(prefers-reduced-motion:reduce){.dock-item,.dock-item svg{transition:none}.dock-item:active{transform:none}}
+
+/* Individual editorial category pages */
+.category-hero{animation:category-reveal .38s ease both;padding-top:52px;padding-bottom:67px}
+.category-hero .hero-copy{max-width:580px}
+.category-hero .hero-copy h1{font-size:clamp(54px,6vw,90px)}
+.category-hero .hero-image{height:450px}
+.category-back{display:inline-flex;align-items:center;gap:9px;background:transparent;color:#7d8577;font-size:12px;padding:0;margin:0 0 27px;transition:color .2s ease,gap .2s ease}
+.category-back:hover{color:#394735;gap:13px}
+.category-hero-footer{display:inline-flex;align-items:center;gap:10px;color:#747e71;font-size:13px;margin-top:24px;padding:13px 18px;border:1px solid #e4e5dd;border-radius:26px;background:#f6f5ef}
+.category-desi-food .hero-copy h1 em{color:#a36f58}
+.category-fast-food .hero-copy h1 em{color:#b1814c}
+.category-foreign-food .hero-copy h1 em{color:#7c907b}
+.saved-hero{padding:85px 0 62px;animation:category-reveal .38s ease both}
+.saved-hero h1{font-family:'Playfair Display',serif;font-size:clamp(55px,7vw,88px);letter-spacing:-2px;font-weight:400;line-height:1.13;margin:20px 0}
+.saved-hero h1 em{color:#a36f58;font-weight:400}
+.saved-hero p{color:#7c8176;line-height:1.8;max-width:570px}
+.saved-count{font-size:13px;color:#596755;display:inline-flex;padding:11px 17px;border-radius:24px;background:#edeee6;margin-top:15px}
+@keyframes category-reveal{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:600px){.category-hero{padding:24px 0 42px;gap:27px}.category-hero .hero-image{height:275px}.category-hero .hero-copy h1{font-size:clamp(50px,12.5vw,70px)}.category-back{margin-bottom:20px}.category-hero-footer{margin-top:16px}.saved-hero{padding:57px 0 45px}.saved-hero h1{font-size:58px}}
+@media(prefers-reduced-motion:reduce){.category-hero,.saved-hero{animation:none}.category-back{transition:none}}
