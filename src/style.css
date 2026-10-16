@@ -19,3 +19,19 @@
 
 /* Fixed food taxonomy */
 .form-fields select{width:100%;border:1px solid #dfdfd5;border-radius:7px;padding:12px 38px 12px 12px;background:#fff;color:#333;appearance:auto;min-height:47px}.form-fields select:focus-visible{outline:3px solid #b5b99b;outline-offset:3px}
+
+/* Floating frosted-glass app navigation */
+body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+.glass-dock{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:15;width:min(470px,calc(100% - 28px));padding:7px;background:rgba(251,250,247,.74);border:1px solid rgba(255,255,255,.86);border-radius:28px;box-shadow:0 15px 55px rgba(35,48,33,.18),0 2px 9px rgba(35,48,33,.08),inset 0 1px rgba(255,255,255,.8);-webkit-backdrop-filter:blur(28px) saturate(170%);backdrop-filter:blur(28px) saturate(170%);isolation:isolate}
+.glass-dock-inner{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+.dock-item{min-width:0;min-height:59px;border-radius:21px;background:transparent;color:#8a9385;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;font-size:10px;font-weight:600;letter-spacing:.02em;position:relative;transition:color .25s ease,background .25s ease,transform .25s cubic-bezier(.2,.8,.2,1);-webkit-tap-highlight-color:transparent}
+.dock-item svg{transition:transform .3s cubic-bezier(.2,1.4,.4,1)}
+.dock-item:hover{color:#394735;background:rgba(69,84,62,.06)}
+.dock-item:active{transform:scale(.91)}
+.dock-item:active svg{transform:scale(.9)}
+.dock-item.is-active{background:#394735;color:#fff;box-shadow:0 5px 14px rgba(42,61,35,.18)}
+.dock-item.is-active svg{transform:translateY(-1px)}
+.dock-item:focus-visible{outline:2px solid #829477;outline-offset:1px}
+@media(min-width:900px){.glass-dock{bottom:23px}.dock-item{min-height:64px}}
+@media(max-width:370px){.glass-dock{width:calc(100% - 18px);padding:5px;border-radius:23px}.dock-item{font-size:9px;min-height:57px;border-radius:18px}}
+@media(prefers-reduced-motion:reduce){.dock-item,.dock-item svg{transition:none}.dock-item:active{transform:none}}
