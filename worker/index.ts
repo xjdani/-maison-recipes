@@ -51,10 +51,10 @@ function recipeFromSchema(raw: unknown) {
 
 
 function cleanText(v: unknown): string {
-  return String(v ?? "").replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|apos|nbsp|lt|gt|#39);/g, x => ({"&amp;":"&","&quot;":'"',"&apos;":"'","&nbsp;":" ","&lt;":"<","&gt;":">","&#39;":"'"} as Record<string,string>)[x] || x).replace(/\\s+/g," ").trim();
+  return String(v ?? "").replace(/<[^>]*>/g, " ").replace(/&(?:amp|quot|apos|nbsp|lt|gt|#39);/g, x => ({"&amp;":"&","&quot;":'"',"&apos;":"'","&nbsp;":" ","&lt;":"<","&gt;":">","&#39;":"'"} as Record<string,string>)[x] || x).replace(/\s+/g," ").trim();
 }
 function parseRecipePage(html: string, source: string): Recipe {
-  const scripts = [...html.matchAll(/<script\\b(?=[^>]*\\btype\\s*=\\s*["']application\\/ld\\+json["'])[^>]*>([\\s\\S]*?)<\\/script\\s*>/gi)];
+  const scripts = [...html.matchAll(/<script\b(?=[^>]*\btype\s*=\s*["']application\/ld\+json["'])[^>]*>([\s\S]*?)<\/script\s*>/gi)];
   let found: Recipe | null = null;
   for (const script of scripts) {
     try {
@@ -81,7 +81,7 @@ function checkedUrl(input: string): URL {
   let u: URL;
   try { u = new URL(input.trim()); } catch { throw Error("Paste a complete HTTPS website URL."); }
   const host = u.hostname.toLowerCase();
-  if (u.protocol !== "https:" || u.username || u.password || u.port || !host.includes(".") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".localhost") || host.endsWith(".test") || host.endsWith(".invalid") || host.endsWith(".example") || host === "localhost" || /^[\\d.]+$/.test(host) || host.includes(":")) throw Error("Only public HTTPS recipe websites are supported.");
+  if (u.protocol !== "https:" || u.username || u.password || u.port || !host.includes(".") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".localhost") || host.endsWith(".test") || host.endsWith(".invalid") || host.endsWith(".example") || host === "localhost" || /^[\d.]+$/.test(host) || host.includes(":")) throw Error("Only public HTTPS recipe websites are supported.");
   return u;
 }
 async function scanRecipe(link: string): Promise<Recipe> {
