@@ -26,7 +26,7 @@ useEffect(()=>{
     if(legacy&&/^[a-f0-9-]{36}$/.test(legacy)){path="/recipes/"+legacy;history.replaceState(history.state,"",path+location.search); }
     setRoutePath(path);
     setQuery(new URLSearchParams(location.search).get("q")||"");
-    const id=path.match(/^\\/recipes\\/([a-f0-9-]{36})$/)?.[1];
+    const id=path.match(/^\/recipes\/([a-f0-9-]{36})$/)?.[1];
     const match=id?recipes.find(r=>r.id===id):undefined;
     setSelected(match||null);
     if(match){setServings(match.servings);setCooking(false);setDone([])}
