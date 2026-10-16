@@ -67,3 +67,10 @@ body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 .subcategory-pill:active{transform:scale(.96)}
 @media(max-width:600px){.subcategory-section{padding:22px 15px;margin-bottom:30px;border-radius:17px}.subcategory-pills{flex-wrap:nowrap;overflow-x:auto;padding-bottom:5px;scrollbar-width:none;margin-right:-15px}.subcategory-pill{white-space:nowrap;flex:none;min-height:42px;padding:9px 13px;font-size:12px}}
 @media(prefers-reduced-motion:reduce){.subcategory-pill{transition:none}}
+
+/* Elegant fallback for recipes awaiting their own photograph */
+.recipe-image-placeholder{height:100%;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:radial-gradient(ellipse at 25% 20%,#eff0e3,#dfe4d3 70%,#d7ddca);color:#66765c}
+.recipe-image-placeholder span{font-family:'Playfair Display',serif;font-size:17px;font-style:italic;color:#687862}
+.detail-image-placeholder{min-height:420px;border-radius:180px 180px 12px 12px}
+.detail-image-placeholder span{font-size:23px}
+@media(max-width:600px){.detail-image-placeholder{min-height:280px;width:100%;border-radius:140px 140px 12px 12px}}
