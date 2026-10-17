@@ -192,3 +192,7 @@ body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
  .home-discovery{padding-bottom:40px}
 }
 @media(prefers-reduced-motion:reduce){.home-feature,.home-cuisine-card{transition:none}}
+
+/* Distinct breathing room between the app header and homepage welcome card */
+.home-discovery{padding-top:clamp(28px,4vw,54px)}
+@media(max-width:700px){.home-discovery{padding-top:24px}}
