@@ -1,6 +1,6 @@
 interface Env { DB: D1Database; ASSETS: Fetcher; ACCESS_AUD?: string; ACCESS_TEAM_DOMAIN?: string; ALLOWED_EMAIL?: string }
-type Recipe = { id: string; title: string; description: string; image: string; category: string; subcategory: string; prep_minutes: number; cook_minutes: number; servings: number; ingredients: unknown[]; steps: unknown[]; source_url: string; favorite: number; created_at?: string; updated_at?: string };
-const fields = "id,title,description,image,category,subcategory,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite,created_at,updated_at";
+type Recipe = { id: string; title: string; description: string; image: string; category: string; subcategory: string; image_credit?: string; prep_minutes: number; cook_minutes: number; servings: number; ingredients: unknown[]; steps: unknown[]; source_url: string; favorite: number; created_at?: string; updated_at?: string };
+const fields = "id,title,description,image,image_credit,category,subcategory,prep_minutes,cook_minutes,servings,ingredients,steps,source_url,favorite,created_at,updated_at";
 function json(data: unknown, status = 200) { return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } }); }
 function normalize(row: Record<string, unknown>) { return { ...row, ingredients: JSON.parse(String(row.ingredients || "[]")), steps: JSON.parse(String(row.steps || "[]")), favorite: Boolean(row.favorite) }; }
 async function owner(request: Request, env: Env): Promise<boolean> {
@@ -134,6 +134,41 @@ async function scanRecipe(link: string): Promise<Recipe> {
   return parseRecipePage(new TextDecoder().decode(bytes),target.toString());
 }
 
+
+type CommonsCredit = { author: string; license: string; source: string; licenseUrl: string };
+function stripMarkup(s:string):string { return s.replace(/<[^>]*>/g," ").replace(/&(?:amp|quot|lt|gt|nbsp|#39);/g,m=>({"&amp;":"&","&quot;":'"',"&lt;":"<","&gt;":">","&nbsp;":" ","&#39;":"'"} as Record<string,string>)[m]||m).replace(/\s+/g," ").trim().slice(0,250); }
+async function discoverCommonsPhoto(title:string):Promise<{image:string;credit:string}|null> {
+  const searchTitle=title.replace(/\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\b/gi,"").trim();
+  const url=new URL("https://commons.wikimedia.org/w/api.php");
+  url.searchParams.set("action","query");
+  url.searchParams.set("generator","search");
+  url.searchParams.set("gsrsearch",searchTitle+" filetype:bitmap");
+  url.searchParams.set("gsrnamespace","6");
+  url.searchParams.set("gsrlimit","12");
+  url.searchParams.set("prop","imageinfo");
+  url.searchParams.set("iiprop","url|extmetadata|size|mime");
+  url.searchParams.set("iiurlwidth","900");
+  url.searchParams.set("format","json");
+  const response=await fetch(url.toString(),{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9000)});
+  if(!response.ok)return null;
+  const data=await response.json() as {query?:{pages?:Record<string,any>}};
+  const pages=Object.values(data.query?.pages||{});
+  const terms=searchTitle.toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>=4&&!["with","and","recipe","style"].includes(x));
+  for (const page of pages) {
+    const info=page.imageinfo?.[0];
+    if(!info||!info.thumburl||!info.url||!info.mime?.startsWith("image/")||info.width<500)continue;
+    if(!new URL(info.thumburl).hostname.endsWith(".wikimedia.org"))continue;
+    const fileTitle=String(page.title||"").toLowerCase().replace(/[_-]/g," ");
+    if(!terms.length||!terms.some(w=>fileTitle.includes(w)))continue;
+    const meta=info.extmetadata||{};
+    const license=stripMarkup(meta.LicenseShortName?.value||"");
+    if(!/^(cc by(?:-sa)?(?: [0-9.]+)?|cc0|public domain)/i.test(license))continue;
+    const credit:CommonsCredit={author:stripMarkup(meta.Artist?.value||"Wikimedia Commons contributor"),license,source:String(info.descriptionurl||"https://commons.wikimedia.org/wiki/"+encodeURIComponent(page.title)),licenseUrl:String(meta.LicenseUrl?.value||"")};
+    return {image:String(info.thumburl),credit:JSON.stringify(credit)};
+  }
+  return null;
+}
+
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (!url.pathname.startsWith("/api/")) return env.ASSETS.fetch(request);
@@ -145,6 +180,19 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (request.method === "GET" && match) {
     const row = await env.DB.prepare("SELECT " + fields + " FROM recipes WHERE id = ?").bind(match[1]).first();
     return row ? json(normalize(row as Record<string, unknown>)) : json({ error: "Not found" }, 404);
+  }
+  const photoMatch=url.pathname.match(/^\/api\/recipe-photo\/([a-f0-9-]{36})$/);
+  if(request.method==="GET"&&photoMatch){
+    const id=photoMatch[1];
+    const row=await env.DB.prepare("SELECT title,image,image_credit FROM recipes WHERE id=?").bind(id).first<{title:string;image:string;image_credit:string}>();
+    if(!row)return json({error:"Not found"},404);
+    if(row.image)return json({image:row.image,credit:row.image_credit||""});
+    try {
+      const photo=await discoverCommonsPhoto(row.title);
+      if(!photo)return new Response(JSON.stringify({image:"",credit:""}),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}});
+      await env.DB.prepare("UPDATE recipes SET image=?,image_credit=? WHERE id=? AND (image='' OR image IS NULL)").bind(photo.image,photo.credit,id).run();
+      return json(photo);
+    }catch{return json({image:"",credit:""});}
   }
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
