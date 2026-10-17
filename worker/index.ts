@@ -156,7 +156,7 @@ async function discoverCommonsPhoto(title:string,diagnostics?:string[]):Promise<
     "Lemon Herb Baked Salmon":"baked salmon",
     "Pan-Seared Fish with Lemon":"fried fish"
   };
-  const searchTitle=aliases[title]||title.replace(/\\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\\b/gi,"").trim();
+  const searchTitle=aliases[title]||title.replace(/\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\b/gi,"").trim();
   const url=new URL("https://commons.wikimedia.org/w/api.php");
   url.searchParams.set("action","query");
   url.searchParams.set("generator","search");
