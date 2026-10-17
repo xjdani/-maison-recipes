@@ -94,6 +94,11 @@ function parseRecipePage(html: string, source: string): Recipe {
   if (!found) throw Error("This page does not expose a complete readable recipe. Try a different recipe website.");
   found.source_url = source;
   const normalized = (value: string) => { try { const url = new URL(value,source); return url.protocol === "https:" || url.protocol === "http:" ? url.href : ""; } catch { return ""; } };
+  if(!found.image){
+    const tag=html.match(/<meta\b[^>]*(?:property|name)\s*=\s*["'](?:og:image|twitter:image)["'][^>]*>/i)?.[0];
+    const image=tag?.match(/\bcontent\s*=\s*["']([^"']+)["']/i)?.[1]||"";
+    if(image)found.image=image.replace(/&amp;/g,"&");
+  }
   found.image = normalized(found.image);
   found.title = cleanText(found.title);
   found.description = cleanText(found.description);
@@ -137,7 +142,7 @@ async function scanRecipe(link: string): Promise<Recipe> {
 
 type CommonsCredit = { author: string; license: string; source: string; licenseUrl: string };
 function stripMarkup(s:string):string { return s.replace(/<[^>]*>/g," ").replace(/&(?:amp|quot|lt|gt|nbsp|#39);/g,m=>({"&amp;":"&","&quot;":'"',"&lt;":"<","&gt;":">","&nbsp;":" ","&#39;":"'"} as Record<string,string>)[m]||m).replace(/\s+/g," ").trim().slice(0,250); }
-async function discoverCommonsPhoto(title:string,diagnostics?:string[]):Promise<{image:string;credit:string}|null> {
+async function discoverCommonsPhoto(title:string):Promise<{image:string;credit:string}|null> {
   const aliases:Record<string,string>={
     "Arvi Masala":"taro root",
     "Beef Boti":"beef kebab",
@@ -167,20 +172,20 @@ async function discoverCommonsPhoto(title:string,diagnostics?:string[]):Promise<
   url.searchParams.set("iiprop","url|extmetadata|size|mime");
   url.searchParams.set("iiurlwidth","900");
   url.searchParams.set("format","json");
-  const response=await fetch(url.toString(),{headers:{"Accept":"application/json","User-Agent":"CookWithDaniel/1.0 (https://food.hasooleilm.org)"},signal:AbortSignal.timeout(9000)}); diagnostics?.push("Commons HTTP "+response.status);
+  const response=await fetch(url.toString(),{headers:{"Accept":"application/json","User-Agent":"CookWithDaniel/1.0 (https://food.hasooleilm.org)"},signal:AbortSignal.timeout(9000)});
   if(!response.ok)return null;
   const data=await response.json() as {query?:{pages?:Record<string,any>}};
-  const pages=Object.values(data.query?.pages||{}); diagnostics?.push("Candidates "+pages.length);
+  const pages=Object.values(data.query?.pages||{});
   const terms=searchTitle.toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>=4&&!["with","and","recipe","style"].includes(x));
   for (const page of pages) {
     const info=page.imageinfo?.[0];
     if(!info||!info.thumburl||!info.url||!info.mime?.startsWith("image/")||info.width<500)continue;
     if(!new URL(info.thumburl).hostname.endsWith(".wikimedia.org"))continue;
     const fileTitle=String(page.title||"").toLowerCase().replace(/[_-]/g," ");
-    if(!terms.length||!terms.some(w=>fileTitle.includes(w)))continue; diagnostics?.push("Title match "+fileTitle);
+    if(!terms.length||!terms.some(w=>fileTitle.includes(w)))continue;
     const meta=info.extmetadata||{};
     const license=stripMarkup(meta.LicenseShortName?.value||"");
-    if(!/^(cc by(?:-sa)?(?: [0-9.]+)?|cc0|public domain)/i.test(license))continue; diagnostics?.push("License "+license);
+    if(!/^(cc by(?:-sa)?(?: [0-9.]+)?|cc0|public domain)/i.test(license))continue;
     const credit:CommonsCredit={author:stripMarkup(meta.Artist?.value||"Wikimedia Commons contributor"),license,source:String(info.descriptionurl||"https://commons.wikimedia.org/wiki/"+encodeURIComponent(page.title)),licenseUrl:String(meta.LicenseUrl?.value||"")};
     return {image:String(info.thumburl),credit:JSON.stringify(credit)};
   }
@@ -200,28 +205,6 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     return row ? json(normalize(row as Record<string, unknown>)) : json({ error: "Not found" }, 404);
   }
 
-  if(request.method==="GET"&&url.pathname==="/api/maintenance/photo-backfill"){
-    const token=url.searchParams.get("key")||"";
-    if(token.length!==43)return json({error:"Forbidden"},403);
-    const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)));
-    const digest=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
-    const grant=await env.DB.prepare("SELECT token_digest FROM photo_backfill_authorization WHERE id=1").first<{token_digest:string}>();
-    if(!grant||grant.token_digest!==digest)return json({error:"Forbidden"},403);
-    const rows=await env.DB.prepare("SELECT id,title FROM recipes WHERE (image='' OR image IS NULL) AND image_backfill_attempted=0 ORDER BY id LIMIT 12").all<{id:string;title:string}>();
-    const results=await Promise.all((rows.results||[]).map(async row=>{
-      try {
-        const photo=await discoverCommonsPhoto(row.title);
-        if(photo){
-          await env.DB.prepare("UPDATE recipes SET image=?,image_credit=?,image_backfill_attempted=1 WHERE id=? AND (image='' OR image IS NULL)").bind(photo.image,photo.credit,row.id).run();
-          return {id:row.id,title:row.title,found:true};
-        }
-        await env.DB.prepare("UPDATE recipes SET image_backfill_attempted=1 WHERE id=?").bind(row.id).run();
-        return {id:row.id,title:row.title,found:false};
-      }catch(e){return {id:row.id,title:row.title,error:String(e).slice(0,100)};}
-    }));
-    const remaining=await env.DB.prepare("SELECT COUNT(*) AS n FROM recipes WHERE (image='' OR image IS NULL) AND image_backfill_attempted=0").first<{n:number}>();
-    return json({checked:results.length,added:results.filter(x=>x.found).length,remaining:remaining?.n||0,results});
-  }
   const photoMatch=url.pathname.match(/^\/api\/recipe-photo\/([a-f0-9-]{36})$/);
   if(request.method==="GET"&&photoMatch){
     const id=photoMatch[1];
@@ -229,11 +212,11 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     if(!row)return json({error:"Not found"},404);
     if(row.image)return json({image:row.image,credit:row.image_credit||""});
     try {
-      const diagnostics:string[]=[]; const photo=await discoverCommonsPhoto(row.title,diagnostics);
-      if(!photo)return new Response(JSON.stringify({image:"",credit:"",...(url.searchParams.get("debug")==="1"?{diagnostics}:{})}),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}});
+      const photo=await discoverCommonsPhoto(row.title);
+      if(!photo)return new Response(JSON.stringify({image:"",credit:""}),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}});
       await env.DB.prepare("UPDATE recipes SET image=?,image_credit=? WHERE id=? AND (image='' OR image IS NULL)").bind(photo.image,photo.credit,id).run();
       return json(photo);
-    }catch(e){return json({image:"",credit:"",...(url.searchParams.get("debug")==="1"?{error:String(e)}:{})});}
+    }catch{return json({image:"",credit:""});}
   }
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
