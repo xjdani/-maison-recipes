@@ -181,6 +181,29 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     const row = await env.DB.prepare("SELECT " + fields + " FROM recipes WHERE id = ?").bind(match[1]).first();
     return row ? json(normalize(row as Record<string, unknown>)) : json({ error: "Not found" }, 404);
   }
+
+  if(request.method==="GET"&&url.pathname==="/api/maintenance/photo-backfill"){
+    const token=url.searchParams.get("key")||"";
+    if(token.length!==43)return json({error:"Forbidden"},403);
+    const bytes=new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(token)));
+    const digest=Array.from(bytes,b=>b.toString(16).padStart(2,"0")).join("");
+    const grant=await env.DB.prepare("SELECT token_digest FROM photo_backfill_authorization WHERE id=1").first<{token_digest:string}>();
+    if(!grant||grant.token_digest!==digest)return json({error:"Forbidden"},403);
+    const rows=await env.DB.prepare("SELECT id,title FROM recipes WHERE (image='' OR image IS NULL) AND image_backfill_attempted=0 ORDER BY id LIMIT 12").all<{id:string;title:string}>();
+    const results=await Promise.all((rows.results||[]).map(async row=>{
+      try {
+        const photo=await discoverCommonsPhoto(row.title);
+        if(photo){
+          await env.DB.prepare("UPDATE recipes SET image=?,image_credit=?,image_backfill_attempted=1 WHERE id=? AND (image='' OR image IS NULL)").bind(photo.image,photo.credit,row.id).run();
+          return {id:row.id,title:row.title,found:true};
+        }
+        await env.DB.prepare("UPDATE recipes SET image_backfill_attempted=1 WHERE id=?").bind(row.id).run();
+        return {id:row.id,title:row.title,found:false};
+      }catch(e){return {id:row.id,title:row.title,error:String(e).slice(0,100)};}
+    }));
+    const remaining=await env.DB.prepare("SELECT COUNT(*) AS n FROM recipes WHERE (image='' OR image IS NULL) AND image_backfill_attempted=0").first<{n:number}>();
+    return json({checked:results.length,added:results.filter(x=>x.found).length,remaining:remaining?.n||0,results});
+  }
   const photoMatch=url.pathname.match(/^\/api\/recipe-photo\/([a-f0-9-]{36})$/);
   if(request.method==="GET"&&photoMatch){
     const id=photoMatch[1];
