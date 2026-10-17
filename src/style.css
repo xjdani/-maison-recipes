@@ -206,5 +206,5 @@ body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 .photo-detail{height:420px;border-radius:180px 180px 12px 12px}
 .photo-detail .recipe-photo-credit{font-size:10px;max-width:85%;bottom:11px;right:12px}
 .photo-mini,.photo-feature{min-height:100%}
-.photo-mini .recipe-photo-credit,.photo-feature .recipe-photo-credit{display:none}
+.photo-mini .recipe-photo-credit,.photo-feature .recipe-photo-credit{font-size:7px;max-width:95%;bottom:3px;right:3px;padding:2px 4px;opacity:.88}
 @media(max-width:600px){.photo-detail{height:280px;width:100%;border-radius:140px 140px 12px 12px}}
