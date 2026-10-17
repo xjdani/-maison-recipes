@@ -74,3 +74,50 @@ body{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 .detail-image-placeholder{min-height:420px;border-radius:180px 180px 12px 12px}
 .detail-image-placeholder span{font-size:23px}
 @media(max-width:600px){.detail-image-placeholder{min-height:280px;width:100%;border-radius:140px 140px 12px 12px}}
+
+/* Accessible category tabs: no clipped horizontal pill carousel */
+.subcategory-section{padding:18px 18px 19px;margin-bottom:24px}
+.subcategory-label{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.subcategory-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;overflow:visible}
+.subcategory-pill{width:100%;min-width:0;min-height:49px;padding:10px 8px;border-radius:13px;display:flex;flex-wrap:wrap;gap:6px;font-size:12px;line-height:1.25}
+.subcategory-pill span{flex:none}
+.category-hero.is-subpage{display:flex;flex-direction:column;align-items:stretch;gap:0;padding:25px 0 23px}
+.category-hero.is-subpage .hero-image{display:none}
+.category-hero.is-subpage .hero-copy{max-width:100%;padding:0}
+.category-hero.is-subpage h1{font-size:clamp(40px,9vw,58px);margin:10px 0}
+.category-hero.is-subpage .hero-copy>p{display:none}
+.category-hero.is-subpage .category-back{margin-bottom:12px}
+.category-hero.is-subpage .category-hero-footer{margin-top:10px}
+.toolbar{justify-content:flex-start}
+.search{width:min(520px,100%)}
+.recipe-load-more{padding:24px 16px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:13px;color:#7c8478;font-size:12px}
+.recipe-load-more button{border-radius:100px;border:1px solid #d5dbcf;padding:11px 19px;background:#f3f5ee;color:#3f5139;font-size:13px;font-weight:700;display:flex;align-items:center;gap:7px}
+.recipe-load-more button svg{transform:rotate(180deg)}
+/* Submenu emerges above the liquid-glass dock */
+.dock-menu-dismiss{position:fixed;inset:0;z-index:14;background:transparent}
+.glass-dock{z-index:16}
+.dock-submenu{position:absolute;bottom:calc(100% + 13px);left:0;right:0;padding:17px;background:rgba(251,250,247,.94);border:1px solid rgba(255,255,255,.94);border-radius:24px;box-shadow:0 16px 50px rgba(27,44,27,.19),inset 0 1px rgba(255,255,255,.9);-webkit-backdrop-filter:blur(30px) saturate(155%);backdrop-filter:blur(30px) saturate(155%);animation:dock-slide-in .2s cubic-bezier(.2,.8,.2,1) both}
+.dock-submenu-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:13px;padding:0 2px 0 5px;color:#364432;font-weight:700;font-family:'Playfair Display',serif;font-size:22px}
+.dock-submenu-header button{background:#ecefe7;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;color:#52664c}
+.dock-submenu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.dock-sub-option{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;padding:14px 11px;background:#f2f3ed;border:1px solid #e5e8dd;border-radius:13px;font-size:12px;color:#4d5a48;font-weight:600;min-height:48px}
+.dock-sub-option span{color:#7d8977;font-size:11px;font-variant-numeric:tabular-nums}
+.dock-sub-option.selected{background:#394735;color:#fff;border-color:#394735}
+.dock-sub-option.selected span{color:#d7e2d0}
+.dock-item>span{display:flex;align-items:center;gap:2px}
+.dock-chevron{transition:transform .18s ease}
+.dock-chevron.open{transform:rotate(180deg)}
+@keyframes dock-slide-in{from{transform:translateY(9px);opacity:0}to{transform:translateY(0);opacity:1}}
+@media(max-width:600px){
+ .subcategory-section{padding:14px 12px 15px;margin:0 0 24px;border-radius:17px}
+ .subcategory-pills{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0;overflow:visible}
+ .subcategory-pill{white-space:normal;font-size:12px;min-height:48px;padding:10px 9px}
+ .category-hero.is-subpage{padding:24px 0 18px}
+ .category-hero.is-subpage h1{font-size:43px}
+ .category-hero.is-subpage .category-hero-footer{padding:9px 12px}
+ .dock-submenu{padding:14px;border-radius:22px}
+ .dock-sub-option{padding:12px 10px;font-size:11px}
+ .glass-dock{bottom:calc(11px + env(safe-area-inset-bottom,0px))}
+ body{padding-bottom:calc(123px + env(safe-area-inset-bottom,0px))}
+}
+@media(prefers-reduced-motion:reduce){.dock-submenu{animation:none}.dock-chevron{transition:none}}
