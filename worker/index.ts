@@ -138,7 +138,25 @@ async function scanRecipe(link: string): Promise<Recipe> {
 type CommonsCredit = { author: string; license: string; source: string; licenseUrl: string };
 function stripMarkup(s:string):string { return s.replace(/<[^>]*>/g," ").replace(/&(?:amp|quot|lt|gt|nbsp|#39);/g,m=>({"&amp;":"&","&quot;":'"',"&lt;":"<","&gt;":">","&nbsp;":" ","&#39;":"'"} as Record<string,string>)[m]||m).replace(/\s+/g," ").trim().slice(0,250); }
 async function discoverCommonsPhoto(title:string,diagnostics?:string[]):Promise<{image:string;credit:string}|null> {
-  const searchTitle=title.replace(/\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\b/gi,"").trim();
+  const aliases:Record<string,string>={
+    "Arvi Masala":"taro root",
+    "Beef Boti":"beef kebab",
+    "Chapli Kebab Curry":"chapli kebab",
+    "Desi Teenday Dry Sabzi":"tinda vegetable",
+    "Mixed Vegetable Salan":"mixed vegetable curry",
+    "Paalak Ki Sabzi":"spinach curry",
+    "Phaliyan Ki Sabzi":"green beans",
+    "Phool Gobhi Aloo":"aloo gobi",
+    "Shaljam Ki Sabzi":"turnip curry",
+    "Teenday Masala":"tinda vegetable",
+    "Beef Shawarma Wrap":"shawarma beef",
+    "Paneer Tikka Wrap":"paneer tikka",
+    "Vegetarian Supreme Pizza":"vegetable pizza",
+    "Banana Oat Pancakes":"banana pancakes",
+    "Lemon Herb Baked Salmon":"baked salmon",
+    "Pan-Seared Fish with Lemon":"fried fish"
+  };
+  const searchTitle=aliases[title]||title.replace(/\\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\\b/gi,"").trim();
   const url=new URL("https://commons.wikimedia.org/w/api.php");
   url.searchParams.set("action","query");
   url.searchParams.set("generator","search");
