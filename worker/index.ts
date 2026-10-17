@@ -137,7 +137,7 @@ async function scanRecipe(link: string): Promise<Recipe> {
 
 type CommonsCredit = { author: string; license: string; source: string; licenseUrl: string };
 function stripMarkup(s:string):string { return s.replace(/<[^>]*>/g," ").replace(/&(?:amp|quot|lt|gt|nbsp|#39);/g,m=>({"&amp;":"&","&quot;":'"',"&lt;":"<","&gt;":">","&nbsp;":" ","&#39;":"'"} as Record<string,string>)[m]||m).replace(/\s+/g," ").trim().slice(0,250); }
-async function discoverCommonsPhoto(title:string):Promise<{image:string;credit:string}|null> {
+async function discoverCommonsPhoto(title:string,diagnostics?:string[]):Promise<{image:string;credit:string}|null> {
   const searchTitle=title.replace(/\b(homemade|classic|pakistani|desi|dry|spicy|crispy|creamy)\b/gi,"").trim();
   const url=new URL("https://commons.wikimedia.org/w/api.php");
   url.searchParams.set("action","query");
@@ -149,20 +149,20 @@ async function discoverCommonsPhoto(title:string):Promise<{image:string;credit:s
   url.searchParams.set("iiprop","url|extmetadata|size|mime");
   url.searchParams.set("iiurlwidth","900");
   url.searchParams.set("format","json");
-  const response=await fetch(url.toString(),{headers:{"Accept":"application/json"},signal:AbortSignal.timeout(9000)});
+  const response=await fetch(url.toString(),{headers:{"Accept":"application/json","User-Agent":"CookWithDaniel/1.0 (https://food.hasooleilm.org)"},signal:AbortSignal.timeout(9000)}); diagnostics?.push("Commons HTTP "+response.status);
   if(!response.ok)return null;
   const data=await response.json() as {query?:{pages?:Record<string,any>}};
-  const pages=Object.values(data.query?.pages||{});
+  const pages=Object.values(data.query?.pages||{}); diagnostics?.push("Candidates "+pages.length);
   const terms=searchTitle.toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(x=>x.length>=4&&!["with","and","recipe","style"].includes(x));
   for (const page of pages) {
     const info=page.imageinfo?.[0];
     if(!info||!info.thumburl||!info.url||!info.mime?.startsWith("image/")||info.width<500)continue;
     if(!new URL(info.thumburl).hostname.endsWith(".wikimedia.org"))continue;
     const fileTitle=String(page.title||"").toLowerCase().replace(/[_-]/g," ");
-    if(!terms.length||!terms.some(w=>fileTitle.includes(w)))continue;
+    if(!terms.length||!terms.some(w=>fileTitle.includes(w)))continue; diagnostics?.push("Title match "+fileTitle);
     const meta=info.extmetadata||{};
     const license=stripMarkup(meta.LicenseShortName?.value||"");
-    if(!/^(cc by(?:-sa)?(?: [0-9.]+)?|cc0|public domain)/i.test(license))continue;
+    if(!/^(cc by(?:-sa)?(?: [0-9.]+)?|cc0|public domain)/i.test(license))continue; diagnostics?.push("License "+license);
     const credit:CommonsCredit={author:stripMarkup(meta.Artist?.value||"Wikimedia Commons contributor"),license,source:String(info.descriptionurl||"https://commons.wikimedia.org/wiki/"+encodeURIComponent(page.title)),licenseUrl:String(meta.LicenseUrl?.value||"")};
     return {image:String(info.thumburl),credit:JSON.stringify(credit)};
   }
@@ -188,11 +188,11 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     if(!row)return json({error:"Not found"},404);
     if(row.image)return json({image:row.image,credit:row.image_credit||""});
     try {
-      const photo=await discoverCommonsPhoto(row.title);
-      if(!photo)return new Response(JSON.stringify({image:"",credit:""}),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}});
+      const diagnostics:string[]=[]; const photo=await discoverCommonsPhoto(row.title,diagnostics);
+      if(!photo)return new Response(JSON.stringify({image:"",credit:"",...(url.searchParams.get("debug")==="1"?{diagnostics}:{})}),{headers:{"content-type":"application/json","cache-control":"public,max-age=86400"}});
       await env.DB.prepare("UPDATE recipes SET image=?,image_credit=? WHERE id=? AND (image='' OR image IS NULL)").bind(photo.image,photo.credit,id).run();
       return json(photo);
-    }catch{return json({image:"",credit:""});}
+    }catch(e){return json({image:"",credit:"",...(url.searchParams.get("debug")==="1"?{error:String(e)}:{})});}
   }
   if (!url.pathname.startsWith("/api/admin/")) return json({ error: "Not found" }, 404);
   if (!(await owner(request, env))) return json({ error: "Unauthorized" }, 401);
